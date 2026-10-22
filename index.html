@@ -487,7 +487,13 @@ audio { width: 100%; margin-top: 12px; }
   async function videoDuration() { for (var i = 0; i < 20; i++) { var d = yt.player && yt.player.getDuration ? yt.player.getDuration() : 0; if (d > 0) return d; await sleep(150); } return 0; }
 
   /* ---------- drop a link: video -> title -> synced lyrics ---------- */
-  function vidOf(u) { u = String(u || ""); var m = u.match(/(?:v=|youtu\.be\/|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/); return m ? m[1] : (/^[\w-]{11}$/.test(u.trim()) ? u.trim() : null); }
+  function vidOf(u) {
+    u = String(u || ""); var m = u.match(/(?:v=|youtu\.be\/|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/);
+    if (m) return m[1];
+    // a "Mix" playlist (list=RD + video id, what YouTube shares from radio and autoplay) starts on that video
+    var mix = u.match(/[?&]list=RD(?:AMVM|MM)?([\w-]{11})(?:[&#]|$)/); if (mix) return mix[1];
+    return /^[\w-]{11}$/.test(u.trim()) ? u.trim() : null;
+  }
   function fmtDur(s) { s = Math.round(s || 0); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
   function cleanTitle(t) {
     return String(t || "")
@@ -528,7 +534,7 @@ audio { width: 100%; margin-top: 12px; }
   var lookupSeq = 0;
   async function dropLink(text) {
     var vid = vidOf(text), my = ++lookupSeq;
-    if (!vid) { status("That isn't a YouTube or YouTube Music link.", true); return; }
+    if (!vid) { status(/list=/.test(String(text)) ? "That's a playlist. Open one song from it, tap Share, and paste that link." : "That isn't a YouTube or YouTube Music link.", true); return; }
     el("nolyr-actions").hidden = true;
     var have = songById(vid);
     if (have && have.lrc) { setSel({ type: "song", id: vid }); cueVideo(vid); status("Back on the setlist. Hit START.", false); return; }
