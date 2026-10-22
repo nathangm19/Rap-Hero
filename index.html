@@ -1,0 +1,940 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b0a0d"><meta name="mobile-web-app-capable" content="yes"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style></head><body><title>Rap Hero</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: a concert stage at night. Spotlights sway behind one phone-width column.
+   Home is the queue: drop a link, see the track, hit START. In game: video up top, the lyric band
+   center stage, the flow lane and the crowd underneath. Black and gold, one red light, nothing else loud. */
+:root {
+  --bg: #0b0a0d; --stage: #141218; --panel: #1a1720; --panel-2: #221e29; --line: #2f2a36;
+  --fg: #f5f1e8; --dim: #b4acbd; --faint: #7a7385;
+  --gold: #f2c14e; --gold-deep: #a8781f; --hot: #ff3b5c; --cool: #4cc9f0; --good: #59e08a;
+  --display: "Anton", "Impact", "Arial Narrow", sans-serif;
+  --body: "Rubik", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); margin: 0;
+  padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); padding-block: 12px 28px;
+  -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+.lights { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.lights i { position: absolute; top: -10%; width: 70%; height: 120%; opacity: .16; filter: blur(8px); transform-origin: 50% 0; }
+.lights i:nth-child(1) { left: -20%; background: linear-gradient(180deg, var(--gold), transparent 75%); clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%); animation: sway 9s ease-in-out infinite alternate; }
+.lights i:nth-child(2) { right: -20%; background: linear-gradient(180deg, var(--hot), transparent 70%); clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%); animation: sway 11s ease-in-out infinite alternate-reverse; opacity: .11; }
+@keyframes sway { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+.wrap { position: relative; z-index: 1; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+button { font: inherit; cursor: pointer; color: inherit; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+/* brand */
+.brand { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding-top: 4px; }
+.logo { font-family: var(--display); font-size: 46px; line-height: .9; letter-spacing: .02em; color: var(--fg); text-transform: uppercase; }
+.logo b { font-weight: 400; color: var(--gold); text-shadow: 0 0 24px rgba(242, 193, 78, .35); }
+.slogan { font-size: 12px; color: var(--dim); text-align: right; max-width: 140px; line-height: 1.3; }
+/* cards */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; min-width: 0; }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 0 0 9px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > .grow { flex: 1 1 160px; min-width: 0; }
+input[type=url], input[type=search], textarea { font: inherit; font-size: 15px; padding: 12px; background: var(--stage); color: var(--fg); border: 2px solid var(--line); border-radius: 12px; width: 100%; min-width: 0; }
+input:focus { border-color: var(--gold); outline: none; }
+.btn { background: var(--panel-2); border: 2px solid var(--line); border-radius: 12px; padding: 11px 14px; font-weight: 700; font-size: 14px; flex: none; }
+.btn.gold { background: var(--gold); border-color: var(--gold); color: var(--bg); }
+.btn:disabled { opacity: .45; cursor: default; }
+.hint { font-size: 12.5px; color: var(--dim); margin-top: 8px; line-height: 1.45; }
+.drop { border-color: var(--gold-deep); background: linear-gradient(180deg, #221c12, var(--panel) 70%); }
+/* now playing card */
+.nowcard { display: flex; gap: 12px; align-items: center; margin-top: 12px; padding: 10px; background: var(--stage); border-radius: 12px; border: 1px solid var(--line); }
+.thumb { width: 92px; aspect-ratio: 16 / 9; border-radius: 8px; flex: none; background: #000 center / cover no-repeat; position: relative; overflow: hidden; }
+.thumb.disc { aspect-ratio: 1; width: 56px; border-radius: 50%; background: radial-gradient(circle, var(--bg) 0 15%, var(--c, var(--gold)) 16% 27%, #0d0c10 28% 100%); }
+.now-meta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.now-meta b { font-family: var(--display); font-weight: 400; font-size: 20px; letter-spacing: .02em; line-height: 1.05; overflow-wrap: anywhere; text-transform: uppercase; }
+.now-meta small { color: var(--dim); font-size: 13px; overflow-wrap: anywhere; }
+.pill { align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 20px; background: var(--panel-2); color: var(--dim); }
+.pill.ok { background: rgba(89, 224, 138, .14); color: var(--good); } .pill.bad { background: rgba(255, 59, 92, .14); color: var(--hot); } .pill.work { color: var(--gold); }
+/* mode */
+.seg { display: flex; gap: 6px; }
+.seg button { flex: 1 1 0; background: var(--stage); border: 2px solid var(--line); color: var(--dim); border-radius: 12px; padding: 10px 4px; font-weight: 700; font-size: 14px; min-width: 0; }
+.seg button[aria-pressed="true"] { color: var(--bg); background: var(--gold); border-color: var(--gold); }
+.seg button:disabled { opacity: .35; }
+.check { display: flex; align-items: center; gap: 9px; font-size: 14px; color: var(--dim); margin-top: 10px; }
+.check input { width: 18px; height: 18px; accent-color: var(--gold); }
+/* start */
+.start { font-family: var(--display); font-size: 34px; letter-spacing: .06em; background: var(--gold); color: var(--bg); border: 0; border-radius: 16px; padding: 14px 10px 12px; width: 100%;
+  box-shadow: 0 0 0 3px rgba(242, 193, 78, .25), 0 10px 40px rgba(242, 193, 78, .25); text-transform: uppercase; }
+.start:active { transform: translateY(1px); }
+.status { font-size: 13.5px; color: var(--dim); text-align: center; min-height: 1.3em; line-height: 1.4; }
+.status.ok { color: var(--good); } .status.bad { color: var(--hot); }
+/* lists */
+.list { display: flex; flex-direction: column; gap: 6px; }
+.item { display: flex; align-items: center; gap: 11px; text-align: left; background: var(--stage); border: 2px solid transparent; border-radius: 12px; padding: 8px 10px; width: 100%; min-width: 0; }
+.item[aria-pressed="true"] { border-color: var(--gold); }
+.item .thumb { width: 64px; }
+.item .thumb.disc { width: 40px; }
+.item .meta { min-width: 0; flex: 1; }
+.item .meta b { display: block; font-weight: 700; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .meta small { display: block; color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .best { font-size: 12px; color: var(--gold); flex: none; font-weight: 700; }
+.item .del { background: none; border: 0; color: var(--faint); font-size: 20px; padding: 0 2px; flex: none; }
+.empty { font-size: 13px; color: var(--dim); line-height: 1.45; }
+details > summary { cursor: pointer; list-style: none; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::after { content: " +"; color: var(--gold); }
+details[open] > summary::after { content: " −"; }
+.setting { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--dim); margin-top: 10px; flex-wrap: wrap; }
+.setting input[type=range] { flex: 1; min-width: 120px; accent-color: var(--gold); }
+.setting select { flex: 1; min-width: 0; font: inherit; padding: 9px; background: var(--stage); color: var(--fg); border: 2px solid var(--line); border-radius: 10px; }
+.meter { height: 6px; background: var(--stage); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--good); }
+kbd { font-family: var(--display); font-size: 13px; background: var(--stage); border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 5px; padding: 0 6px; }
+/* game */
+#yt-box { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #000; border: 1px solid var(--line); }
+#yt-box iframe, #yt-player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.hud { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: end; }
+.hud small { display: block; font-size: 10px; font-weight: 700; letter-spacing: .14em; color: var(--faint); }
+.hud b { font-family: var(--display); font-weight: 400; font-size: 30px; line-height: 1; color: var(--gold); font-variant-numeric: tabular-nums; }
+.hud .right { text-align: right; }
+.hud .right b { color: var(--fg); font-size: 24px; }
+.crowdbar { height: 12px; border-radius: 6px; background: var(--stage); border: 1px solid var(--line); overflow: hidden; margin-top: 4px; }
+.crowdbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); transition: width .15s linear; }
+.crowdbar.hype i { background: linear-gradient(90deg, var(--hot), var(--gold)); }
+.who { text-align: center; font-family: var(--display); color: var(--cool); font-size: 20px; letter-spacing: .06em; }
+.band { background: linear-gradient(180deg, rgba(0,0,0,.0), rgba(0,0,0,.35)); border-top: 2px solid var(--gold-deep); border-bottom: 2px solid var(--gold-deep); padding: 10px 4px 8px; }
+.lyrics { min-height: 78px; font-size: 24px; font-weight: 800; line-height: 1.28; text-align: center; overflow-wrap: anywhere; letter-spacing: .01em; }
+.lyrics .w { color: #5d5768; transition: color .08s; }
+.lyrics .w.hit { color: var(--fg); }
+.lyrics .w.fire { color: var(--gold); }
+.lyrics .w.miss { color: #8a3346; text-decoration: line-through; text-decoration-thickness: 3px; }
+.lyrics .w.now { color: var(--gold); text-shadow: 0 0 18px rgba(242, 193, 78, .55); }
+.lyrics .next { display: block; font-size: 15px; font-weight: 500; color: var(--faint); margin-top: 4px; }
+.stagewrap { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--stage); }
+canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+/* results */
+.stars { font-size: 44px; letter-spacing: .12em; text-align: center; color: var(--gold); text-shadow: 0 0 20px rgba(242, 193, 78, .4); }
+.stars .off { color: #3a3442; text-shadow: none; }
+.verdict { font-family: var(--display); font-size: 44px; text-align: center; text-transform: uppercase; letter-spacing: .03em; line-height: 1; }
+.battle { text-align: center; font-family: var(--display); font-size: 26px; color: var(--hot); letter-spacing: .03em; }
+.newbest { text-align: center; color: var(--gold); font-family: var(--display); font-size: 18px; letter-spacing: .08em; margin-top: 4px; }
+.res-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+.res-grid div { background: var(--stage); border-radius: 12px; padding: 10px; min-width: 0; }
+.res-grid b { display: block; font-family: var(--display); font-weight: 400; font-size: 26px; color: var(--fg); }
+.res-grid small { color: var(--dim); font-size: 12px; }
+audio { width: 100%; margin-top: 12px; }
+@media (prefers-reduced-motion: reduce) { .lights i { animation: none; } * { transition: none !important; } }
+</style>
+
+<div class="lights" aria-hidden="true"><i></i><i></i></div>
+<div class="wrap">
+  <header class="brand">
+    <div class="logo">Rap <b>Hero</b></div>
+    <div class="slogan">Your stage. Your mic. Any track.</div>
+  </header>
+
+  <!-- HOME -->
+  <section id="menu" class="stack">
+    <div class="card drop">
+      <p class="eyebrow">Drop a track</p>
+      <div class="row">
+        <input type="url" id="link" class="grow" placeholder="Paste a YouTube or YouTube Music link" autocomplete="off" inputmode="url">
+        <button class="btn gold" id="paste">Paste</button>
+      </div>
+      <div class="hint" id="link-hint">In YouTube or YouTube Music tap Share, then Copy link. Once Rap Hero is on your home screen, you can share straight to it.</div>
+      <div class="nowcard" id="now-card" hidden>
+        <div class="thumb" id="now-thumb"></div>
+        <div class="now-meta"><b id="now-title"></b><small id="now-artist"></small><span class="pill" id="now-lyr"></span></div>
+      </div>
+      <div class="row" id="nolyr-actions" style="margin-top:10px" hidden>
+        <button class="btn" id="go-free">Freestyle over it</button>
+        <button class="btn" id="go-own">Paste the lyrics</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">How you're playing</p>
+      <div class="seg" id="mode">
+        <button data-m="mic" aria-pressed="true">Rap · mic</button>
+        <button data-m="tap" aria-pressed="false">Tap</button>
+        <button data-m="free" aria-pressed="false">Freestyle</button>
+      </div>
+      <label class="check" id="battle-row"><input type="checkbox" id="battle"> 2-player battle, pass the phone</label>
+      <div id="diff-row" hidden>
+        <div class="seg" id="diff" style="margin-top:10px">
+          <button data-d="easy" aria-pressed="false">Easy</button>
+          <button data-d="normal" aria-pressed="true">Normal</button>
+          <button data-d="hard" aria-pressed="false">Hard</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="start" id="play">Start</button>
+    <div class="status" id="song-stat"></div>
+
+    <div class="card">
+      <p class="eyebrow">Your setlist</p>
+      <div class="list" id="my-songs"></div>
+      <p class="eyebrow" style="margin-top:14px">House beats</p>
+      <div class="list" id="tracks"></div>
+    </div>
+
+    <details class="card" id="own">
+      <summary>No lyrics found? Paste them</summary>
+      <p class="hint">For freestyles and tracks the lyrics library doesn't have. Paste them one line per bar, then tap each line in time while the video plays. It saves on this phone.</p>
+      <div class="row" style="margin-top:8px"><input type="search" id="own-name" class="grow" placeholder="Title"><input type="search" id="own-artist" class="grow" placeholder="Artist"></div>
+      <div class="row" style="margin-top:8px"><input type="url" id="own-link" class="grow" placeholder="YouTube or YouTube Music link"></div>
+      <textarea id="own-lyrics" rows="7" placeholder="Paste lyrics, one line per bar" style="margin-top:8px"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn gold" id="own-save">Save, then sync it</button></div>
+    </details>
+
+    <details class="card" id="settings">
+      <summary>Mic and timing</summary>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="mic-on">Turn on mic</button>
+        <button class="btn" id="calib" disabled>Calibrate</button>
+      </div>
+      <div class="setting" id="mic-pick-row" hidden><label for="mic-pick">Mic</label><select id="mic-pick"></select></div>
+      <div class="meter"><i id="mic-meter"></i></div>
+      <div class="hint" id="mic-stat">Wear earbuds. With Bluetooth earbuds, pick the phone's own mic here so the music stays in full quality.</div>
+      <div class="setting"><label for="off">Audio delay</label><input type="range" id="off" min="-150" max="300" step="10" value="0"><span id="off-v">0 ms</span></div>
+      <label class="check"><input type="checkbox" id="lyr-check"> Check my words too (Chrome sends your voice to Google's speech service)</label>
+    </details>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" class="stack" hidden>
+    <div class="who" id="who" hidden></div>
+    <div id="yt-box" hidden><div id="yt-player"></div></div>
+    <div class="hud">
+      <div><small>Score</small><b id="score">0</b></div>
+      <div><small>Crowd</small><div class="crowdbar" id="crowdbar"><i id="crowd"></i></div></div>
+      <div class="right"><small>Streak</small><b id="mult">0</b></div>
+    </div>
+    <div class="band"><div class="lyrics" id="lyrics" aria-live="off"></div></div>
+    <div class="stagewrap"><canvas id="cv" aria-label="Stage"></canvas></div>
+    <div class="row" id="nudge" hidden>
+      <button class="btn" id="nudge-m" style="flex:1">Lyrics later</button>
+      <span id="nudge-v" style="font-size:13px;color:var(--dim);flex:none">+0.00 s</span>
+      <button class="btn" id="nudge-p" style="flex:1">Lyrics sooner</button>
+    </div>
+    <div id="sync-box" class="stack" hidden>
+      <button class="start" id="sync-tap" style="font-size:24px">Tap as this line starts</button>
+      <div class="row"><button class="btn" id="sync-undo" style="flex:1">Undo</button><button class="btn" id="sync-done" style="flex:1">Finish sync</button></div>
+      <div class="status" id="sync-help"></div>
+    </div>
+    <button class="btn" id="quit">Leave the stage</button>
+  </section>
+
+  <!-- BETWEEN BATTLE ROUNDS -->
+  <section id="pass" class="card stack" hidden>
+    <div class="battle">Pass the mic</div>
+    <div class="status" id="pass-sub"></div>
+    <button class="start" id="pass-go">Player 2, go</button>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="results" class="card" hidden>
+    <p class="eyebrow" id="res-title">Results</p>
+    <div class="battle" id="res-battle" hidden></div>
+    <div class="stars" id="stars"></div>
+    <div class="verdict" id="rank"></div>
+    <div class="newbest" id="newbest" hidden>New best</div>
+    <div class="res-grid" id="res-grid">
+      <div><b id="r-score">0</b><small>Score</small></div>
+      <div><b id="r-acc">0%</b><small>Words on the beat</small></div>
+      <div><b id="r-combo">0</b><small>Longest streak</small></div>
+      <div><b id="r-perf" style="font-size:20px">0</b><small>Fire / Clean / OK / Miss</small></div>
+      <div id="r-lyr-box" hidden><b id="r-lyr">0%</b><small>Words heard right</small></div>
+    </div>
+    <div id="rec-box" hidden>
+      <audio id="rec-audio" controls></audio>
+      <div class="row" style="margin-top:8px"><a class="btn" id="rec-save" download="rap-hero-freestyle.webm" style="text-decoration:none;flex:1;text-align:center">Save recording</a></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="start" id="again" style="flex:2;font-size:24px">Run it back</button>
+      <button class="btn" id="tomenu" style="flex:1;align-self:stretch">Setlist</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // House beats. Each bar is 8 eighth-notes; "_" is a rest; a token ending in "-" joins the next.
+  var TRACKS = [
+    { id: "hardhat", name: "Hard Hat Flow", bpm: 88, c: "var(--gold)", roots: [110, 87.31, 130.81, 98], blurb: "Boom-bap from the job site",
+      verse: ["Hard hat on _ boots laced tight _", "Sun's not up but the site's lit bright", "Pour the slab _ set the frame _", "Ev'ry day we lev- el up the game",
+              "Dry- wall up _ paint goes on _", "Ceil- ing grid and the lights are on", "Floor goes down _ doors swing wide _", "Punch list clean _ walk it with pride"],
+      hook: ["Takt time zone _ crew moves through _", "One two three four five that's the view", "Plan the work and work the plan _", "Hard hat flow I'm the sched- ule man"] },
+    { id: "repit", name: "Rep It Out", bpm: 94, c: "var(--cool)", roots: [98, 116.54, 87.31, 130.81], blurb: "Gym anthem, three sets deep",
+      verse: ["Chalk my hands _ step up slow _", "Three sets deep now I'm good to go", "Bench at one nine oh _ yeah _", "Top of range so the weight goes up",
+              "Rows on C _ squats on A _", "B day pulls _ I'm here to stay", "No skip day _ no fake rep _", "Lock it in and watch ev'- ry step"],
+      hook: ["Rep it out _ rep it out _", "Count it loud that's what it's a- bout", "Rest two min- utes drink some wa- ter", "Ev'- ry week I'm get- ting strong- er"] },
+    { id: "boss", name: "Boss Level", bpm: 102, c: "var(--hot)", roots: [123.47, 98, 110, 146.83], blurb: "Fast one. Press start",
+      verse: ["Press start _ here we go _ _", "Lev- el one I'm steal- ing the show", "Jump the gap _ grab the coin _", "Pow- er up now my turn to join",
+              "Two more lives _ one more try _", "Pix- el rain fall- ing from the sky", "Read the pat- tern _ time it right", "Save the world be- fore it's night _"],
+      hook: ["Boss lev- el _ boss lev- el _", "Ev'- ry note right I got the skill", "Com- bo high _ nev- er stop _", "Fi- nal boss down I'm on top _"] }
+  ];
+  var LANES = ["--gold", "--hot", "--cool", "--good"], KEYS = { d: 0, f: 1, j: 2, k: 3, arrowleft: 0, arrowdown: 1, arrowup: 2, arrowright: 3 };
+  var WIN_TAP = { perfect: 0.05, great: 0.095, good: 0.15 }, WIN_MIC = { perfect: 0.07, great: 0.12, good: 0.19 }, WIN_SONG = { perfect: 0.12, great: 0.2, good: 0.3 };
+  var PTS = { perfect: 300, great: 200, good: 100 }, CALL = { perfect: "FIRE", great: "CLEAN", good: "OK" };
+  var css = getComputedStyle(document.documentElement);
+  function cv(n) { return css.getPropertyValue(n).trim(); }
+  function el(id) { return document.getElementById(id); }
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  function median(a) { var s = a.slice().sort(function (x, y) { return x - y; }), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function status(msg, kind) { var s = el("song-stat"); s.textContent = msg || ""; s.className = "status" + (kind === true ? " bad" : kind === false ? " ok" : ""); }
+
+  var mode = store("rh-mode") || "mic", diff = "normal", battleOn = false;
+  if (["mic", "tap", "free"].indexOf(mode) < 0) mode = "mic";
+  var offsetMs = +(store("rh-offset") || 0) || 0, micOffset = +(store("rh-mic-offset") || 0) || 0;
+  var actx = null, noise = null, g = null, raf = 0, battle = null;
+  var songs = []; try { songs = JSON.parse(store("rh-songs") || "[]") || []; } catch (e) { songs = []; }
+  songs = songs.filter(function (s) { return s && s.vid; });
+  var sel = null; try { sel = JSON.parse(store("rh-sel") || "null"); } catch (e) { sel = null; }
+  function saveSongs() { store("rh-songs", JSON.stringify(songs)); }
+  function setSel(s) { sel = s; store("rh-sel", JSON.stringify(s)); renderLists(); renderNow(); }
+  function songById(id) { return songs.filter(function (s) { return s.id === id; })[0] || null; }
+  function beatById(id) { return TRACKS.filter(function (t) { return t.id === id; })[0] || null; }
+
+  /* ---------- charts ---------- */
+  function bars(t) { return t.verse.slice(0, 4).concat(t.hook, t.verse.slice(4), t.hook); }
+  function hash(s) { var h = 7; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+  function buildChart(t, d) {
+    var eighth = 60 / t.bpm / 2, notes = [], words = [], lines = [], prev = { lane: -1, slot: -9 }, bs = bars(t);
+    bs.forEach(function (line, b) {
+      lines.push({ t: b * 8 * eighth, end: (b + 1) * 8 * eighth });
+      var toks = line.split(/\s+/); while (toks.length < 8) toks.push("_");
+      toks.slice(0, 8).forEach(function (tok, s) {
+        if (tok === "_") return;
+        var slot = b * 8 + s, lane = (hash(tok.toLowerCase()) + s) % 4;
+        if (lane === prev.lane && slot - prev.slot <= 1) lane = (lane + 1 + (s % 2)) % 4;
+        var w = { bar: b, t: slot * eighth, text: tok, join: /-$/.test(tok), state: "" };
+        words.push(w);
+        if (d === "easy" && s % 2) { w.state = "auto"; return; }
+        notes.push({ t: w.t, lane: lane, word: w, done: false }); prev = { lane: lane, slot: slot };
+      });
+    });
+    return { notes: notes, words: words, lines: lines, eighth: eighth, win: null };
+  }
+  // LRCLIB times whole lines. Each word gets a slot in its line, weighted by syllables, so the
+  // score reads your flow through the line rather than exact syllables.
+  function syllables(w) { var m = w.toLowerCase().replace(/[^a-z]/g, "").replace(/e$/, "").match(/[aeiouy]+/g); return Math.max(1, m ? m.length : 1); }
+  function songChart(lrc, d) {
+    var rows = [];
+    lrc.split(/\r?\n/).forEach(function (ln) { var m = ln.match(/^\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)$/); if (m) rows.push({ t: +m[1] * 60 + +m[2], text: m[3].trim() }); });
+    var notes = [], words = [], lines = [], prevLane = -1;
+    rows.forEach(function (r, i) {
+      if (!r.text) return;
+      var nextT = i + 1 < rows.length ? rows[i + 1].t : r.t + 4, ws = r.text.split(/\s+/).filter(function (w) { return /[a-z0-9]/i.test(w); });
+      if (!ws.length) return;
+      var syl = ws.map(syllables), total = syl.reduce(function (a, b) { return a + b; }, 0);
+      var span = Math.min((nextT - r.t) * 0.88, total * 0.3 + 0.25), acc = 0, li = lines.length;
+      lines.push({ t: r.t, end: nextT });
+      ws.forEach(function (w, j) {
+        var wt = r.t + span * acc / total; acc += syl[j];
+        var word = { bar: li, t: wt, text: w, join: false, state: "" };
+        words.push(word);
+        var lane = (hash(w.toLowerCase()) + j) % 4; if (lane === prevLane) lane = (lane + 1) % 4; prevLane = lane;
+        if (d === "easy" && j % 2) { word.state = "auto"; return; }
+        notes.push({ t: wt, lane: lane, word: word, done: false });
+      });
+    });
+    return { notes: notes, words: words, lines: lines, eighth: 0.25, song: true };
+  }
+
+  /* ---------- audio: house beats ---------- */
+  function ensureAudio() {
+    if (!actx) {
+      var AC = window.AudioContext || window.webkitAudioContext; actx = new AC({ latencyHint: "interactive" });
+      noise = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+      var d = noise.getChannelData(0); for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (actx.state === "suspended") actx.resume();
+  }
+  function env(node, t, peak, dur) { node.gain.setValueAtTime(0.0001, t); node.gain.exponentialRampToValueAtTime(peak, t + 0.004); node.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
+  function kick(t, out) { var o = actx.createOscillator(), a = actx.createGain(); o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.14); env(a, t, 0.9, 0.32); o.connect(a).connect(out); o.start(t); o.stop(t + 0.35); }
+  function snare(t, out) {
+    var n = actx.createBufferSource(), f = actx.createBiquadFilter(), a = actx.createGain(); n.buffer = noise; f.type = "highpass"; f.frequency.value = 1400; env(a, t, 0.5, 0.18); n.connect(f).connect(a).connect(out); n.start(t); n.stop(t + 0.2);
+    var o = actx.createOscillator(), b = actx.createGain(); o.frequency.value = 190; env(b, t, 0.25, 0.08); o.connect(b).connect(out); o.start(t); o.stop(t + 0.1);
+  }
+  function hat(t, out, v) { var n = actx.createBufferSource(), f = actx.createBiquadFilter(), a = actx.createGain(); n.buffer = noise; f.type = "highpass"; f.frequency.value = 7500; env(a, t, v || 0.14, 0.045); n.connect(f).connect(a).connect(out); n.start(t); n.stop(t + 0.06); }
+  function bass(t, hz, dur, out) { var o = actx.createOscillator(), f = actx.createBiquadFilter(), a = actx.createGain(); o.type = "sawtooth"; o.frequency.value = hz / 2; f.type = "lowpass"; f.frequency.value = 420; env(a, t, 0.32, dur); o.connect(f).connect(a).connect(out); o.start(t); o.stop(t + dur + 0.02); }
+  function click(t, out, hi) { var o = actx.createOscillator(), a = actx.createGain(); o.frequency.value = hi ? 1760 : 1320; env(a, t, 0.5, 0.05); o.connect(a).connect(out); o.start(t); o.stop(t + 0.06); }
+  function blip(lane) { if (!actx || !g || !g.out) return; var t = actx.currentTime, o = actx.createOscillator(), a = actx.createGain(); o.type = "square"; o.frequency.value = [523.25, 587.33, 659.25, 783.99][lane]; env(a, t, 0.05, 0.09); o.connect(a).connect(g.out); o.start(t); o.stop(t + 0.1); }
+  function scheduleBeat(t, t0, nBars, out) {
+    var beat = 60 / t.bpm, e = beat / 2;
+    for (var c = 0; c < 4; c++) hat(t0 - 4 * beat + c * beat, out, 0.3);
+    var KICK = [0, 3, 5], SNARE = [2, 6], BASS = [0, 3, 5, 7];
+    for (var b = 0; b < nBars + 1; b++) {
+      var root = t.roots[b % 4], last = b === nBars;
+      for (var s = 0; s < 8; s++) {
+        var at = t0 + (b * 8 + s) * e;
+        if (KICK.indexOf(s) >= 0) kick(at, out);
+        if (last) { if (s === 0) snare(at, out); continue; }
+        if (SNARE.indexOf(s) >= 0) snare(at, out);
+        hat(at, out, s % 2 ? 0.08 : 0.14);
+        if (BASS.indexOf(s) >= 0) bass(at, root, e * (s === 7 ? 0.9 : 1.8), out);
+      }
+    }
+    return t0 + nBars * 8 * e + 1.2;
+  }
+
+  /* ---------- mic: syllable onsets ---------- */
+  var mic = { stream: null, an: null, buf: null, src: null, floor: 0.004, prev: 0, last: -1, listen: null, level: 0, looping: false };
+  var hasMicAPI = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  async function micOn(deviceId) {
+    var stat = el("mic-stat");
+    if (typeof deviceId !== "string") deviceId = store("rh-mic-dev") || "";
+    if (!hasMicAPI) { stat.textContent = "This view has no microphone. Open Rap Hero from your home screen."; return false; }
+    ensureAudio();
+    try {
+      var ac = { echoCancellation: true, noiseSuppression: true, autoGainControl: false }; if (deviceId) ac.deviceId = { exact: deviceId };
+      try { mic.stream = await navigator.mediaDevices.getUserMedia({ audio: ac }); }
+      catch (e1) { if (!deviceId) throw e1; delete ac.deviceId; mic.stream = await navigator.mediaDevices.getUserMedia({ audio: ac }); }
+    } catch (e) { stat.textContent = e && e.name === "NotAllowedError" ? "Mic blocked. Allow the microphone for Rap Hero in Chrome's site settings." : "No microphone found."; return false; }
+    if (mic.src) { try { mic.src.disconnect(); } catch (e) {} }
+    mic.src = actx.createMediaStreamSource(mic.stream);
+    var hp = actx.createBiquadFilter(), lp = actx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 250; lp.type = "lowpass"; lp.frequency.value = 3400;
+    mic.an = actx.createAnalyser(); mic.an.fftSize = 512; mic.buf = new Float32Array(mic.an.fftSize);
+    mic.src.connect(hp).connect(lp).connect(mic.an);
+    listMics();
+    stat.textContent = micOffset ? "Mic on. Calibrated at " + Math.round(micOffset * 1000) + " ms." : "Mic on. Calibrate once for the tightest scoring.";
+    el("mic-on").textContent = "Mic is on"; el("mic-on").disabled = true; el("calib").disabled = false;
+    if (!mic.looping) { mic.looping = true; (function loop() { pollMic(); el("mic-meter").style.width = Math.min(100, mic.level * 900) + "%"; requestAnimationFrame(loop); })(); }
+    return true;
+  }
+  async function listMics() {
+    try {
+      var ds = (await navigator.mediaDevices.enumerateDevices()).filter(function (d) { return d.kind === "audioinput"; });
+      var s = el("mic-pick"), cur = mic.stream && mic.stream.getAudioTracks()[0] ? mic.stream.getAudioTracks()[0].getSettings().deviceId : "";
+      s.textContent = "";
+      ds.forEach(function (d, i) { var o = document.createElement("option"); o.value = d.deviceId; o.textContent = d.label || "Microphone " + (i + 1); if (d.deviceId === cur) o.selected = true; s.appendChild(o); });
+      el("mic-pick-row").hidden = ds.length < 2;
+    } catch (e) {}
+  }
+  el("mic-pick").addEventListener("change", function () { var id = el("mic-pick").value; store("rh-mic-dev", id); if (mic.stream) mic.stream.getTracks().forEach(function (t) { t.stop(); }); micOn(id); });
+  // A syllable is a jump in voice-band energy well above the running noise floor.
+  function pollMic() {
+    if (!mic.an) return;
+    mic.an.getFloatTimeDomainData(mic.buf);
+    var s = 0; for (var i = 0; i < mic.buf.length; i++) s += mic.buf[i] * mic.buf[i];
+    var rms = Math.sqrt(s / mic.buf.length), now = actx.currentTime - mic.buf.length / actx.sampleRate / 2;
+    mic.level = rms;
+    mic.floor = rms < mic.floor * 2.5 ? mic.floor * 0.97 + rms * 0.03 : mic.floor * 0.999 + rms * 0.001;
+    mic.floor = Math.max(0.0015, mic.floor);
+    if (rms > mic.floor * 3.2 && rms > 0.012 && rms > mic.prev * 1.35 && now - mic.last > 0.11) { mic.last = now; if (mic.listen) mic.listen(now); }
+    mic.prev = rms * 0.6 + mic.prev * 0.4;
+  }
+  async function calibrate() {
+    ensureAudio();
+    var stat = el("mic-stat"), out = actx.createGain(); out.connect(actx.destination);
+    var beat = 0.6, t0 = actx.currentTime + 0.8, clicks = [], heard = [];
+    for (var i = 0; i < 8; i++) { clicks.push(t0 + i * beat); click(t0 + i * beat, out, i % 4 === 0); }
+    stat.textContent = "Say \"HA\" on every click. 8 clicks."; mic.listen = function (t) { heard.push(t); }; el("calib").disabled = true;
+    await sleep((0.8 + 8 * beat + 0.5) * 1000);
+    mic.listen = null; el("calib").disabled = false;
+    var diffs = [];
+    clicks.forEach(function (c) { var b = null; heard.forEach(function (h) { if (Math.abs(h - c) < 0.3 && (b === null || Math.abs(h - c) < Math.abs(b - c))) b = h; }); if (b !== null) diffs.push(b - c); });
+    if (diffs.length < 5) { stat.textContent = "Caught " + diffs.length + " of 8. Get closer to the mic, say it sharper, and run it again."; return; }
+    micOffset = median(diffs); store("rh-mic-offset", String(micOffset));
+    stat.textContent = "Calibrated. Your voice lands " + Math.round(micOffset * 1000) + " ms after the click (" + diffs.length + " of 8 caught).";
+  }
+
+  /* ---------- word check (optional) ---------- */
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function norm(s) { return s.toLowerCase().replace(/[^a-z0-9' ]/g, " ").replace(/'/g, "").split(/\s+/).filter(Boolean); }
+  function lyricWords(chart) { var out = [], cur = ""; chart.words.forEach(function (w) { cur += w.text.replace(/-$/, ""); if (!w.join) { out.push(cur); cur = ""; } }); return norm(out.join(" ")); }
+  function lcs(a, b) { var p = new Array(b.length + 1).fill(0); for (var i = 1; i <= a.length; i++) { var q = [0]; for (var j = 1; j <= b.length; j++) q[j] = a[i - 1] === b[j - 1] ? p[j - 1] + 1 : Math.max(p[j], q[j - 1]); p = q; } return p[b.length]; }
+  function startSR() {
+    if (!SR || !el("lyr-check").checked) return null;
+    var r = new SR(), heard = { text: "" }; r.continuous = true; r.interimResults = false; r.lang = "en-US";
+    r.onresult = function (e) { for (var i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) heard.text += " " + e.results[i][0].transcript; };
+    r.onend = function () { if (g && !g.over) { try { r.start(); } catch (e) {} } }; r.onerror = function () {};
+    try { r.start(); } catch (e) { return null; }
+    heard.stop = function () { try { r.onend = null; r.stop(); } catch (e) {} };
+    return heard;
+  }
+
+  /* ---------- YouTube (the official player; the audio never leaves YouTube) ---------- */
+  var yt = { player: null, ready: false, vid: null, t: 0, at: 0, playing: false, state: -1, loading: null };
+  var embeddable = !/claude\.ai|claudeusercontent|anthropic/.test(location.hostname) && /^https?:$/.test(location.protocol);
+  function loadYT() {
+    if (yt.loading) return yt.loading;
+    yt.loading = new Promise(function (res, rej) {
+      if (window.YT && window.YT.Player) return res();
+      window.onYouTubeIframeAPIReady = function () { res(); };
+      var s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; s.onerror = function () { yt.loading = null; rej(new Error("yt")); }; document.head.appendChild(s);
+    });
+    return yt.loading;
+  }
+  function cueVideo(vid) {
+    if (!embeddable) return Promise.resolve();
+    return loadYT().then(function () {
+      if (yt.player && yt.ready) { if (yt.vid !== vid) { yt.player.cueVideoById(vid); yt.vid = vid; } return; }
+      return new Promise(function (res) {
+        yt.vid = vid;
+        yt.player = new YT.Player("yt-player", { videoId: vid, playerVars: { playsinline: 1, rel: 0, modestbranding: 1, controls: 1 },
+          events: { onReady: function () { yt.ready = true; res(); },
+                    onStateChange: function (e) { yt.playing = e.data === 1; yt.state = e.data; sampleYT(); },
+                    onError: function (e) { status(e.data === 101 || e.data === 150 ? "That upload won't play outside YouTube. Try another upload of the same song." : "YouTube couldn't play that link.", true); if (g && g.yt) quit(); } } });
+      });
+    }).catch(function () { status("Couldn't load the YouTube player. Check your connection.", true); });
+  }
+  function sampleYT() { if (!yt.player || !yt.player.getCurrentTime) return; var t = yt.player.getCurrentTime(); if (t !== yt.t) { yt.t = t; yt.at = performance.now(); } }
+  function ytNow() { sampleYT(); return yt.t + (yt.playing ? (performance.now() - yt.at) / 1000 : 0); }
+  async function videoDuration() { for (var i = 0; i < 20; i++) { var d = yt.player && yt.player.getDuration ? yt.player.getDuration() : 0; if (d > 0) return d; await sleep(150); } return 0; }
+
+  /* ---------- drop a link: video -> title -> synced lyrics ---------- */
+  function vidOf(u) { u = String(u || ""); var m = u.match(/(?:v=|youtu\.be\/|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/); return m ? m[1] : (/^[\w-]{11}$/.test(u.trim()) ? u.trim() : null); }
+  function fmtDur(s) { s = Math.round(s || 0); return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60); }
+  function cleanTitle(t) {
+    return String(t || "")
+      .replace(/\s*[\(\[][^\)\]]*\b(official|video|audio|lyrics?|hd|hq|4k|visuali[sz]er|explicit|clean|remaster(ed)?|mv|instrumental|prod\.?|beat)\b[^\)\]]*[\)\]]/gi, "")
+      .replace(/\b(official (music )?video|official audio|lyric video|lyrics|instrumental)\b/gi, "")
+      .replace(/\s+(ft\.?|feat\.?|featuring)\s.*$/i, "").replace(/\s*[|•]\s*.*$/, "").replace(/\s{2,}/g, " ").replace(/[\s\-–—]+$/, "").trim();
+  }
+  function splitTitle(title, author) {
+    var a = String(author || "").replace(/\s*-\s*Topic$/i, "").replace(/VEVO$/i, "").trim(), t = cleanTitle(title);
+    var m = t.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+    return m ? { artist: m[1].trim(), track: m[2].trim() } : { artist: a, track: t };
+  }
+  async function getJSON(url, tries) {
+    for (var i = 0; i < (tries || 3); i++) {
+      try { var r = await fetch(url); if (r.ok) return await r.json(); if (r.status !== 503 && r.status !== 429 && r.status < 500) return null; } catch (e) {}
+      await sleep(800 * (i + 1));
+    }
+    throw new Error("unreachable");
+  }
+  async function videoInfo(vid) {
+    var u = "https://www.youtube.com/watch?v=" + vid;
+    try { var j = await getJSON("https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(u), 2); if (j && j.title) return j; } catch (e) {}
+    try { var k = await getJSON("https://noembed.com/embed?url=" + encodeURIComponent(u), 2); if (k && k.title) return k; } catch (e) {}
+    return null;
+  }
+  async function findSynced(artist, track) {
+    var tries = [];
+    if (artist && track) tries.push("/api/search?track_name=" + encodeURIComponent(track) + "&artist_name=" + encodeURIComponent(artist));
+    tries.push("/api/search?q=" + encodeURIComponent((artist ? artist + " " : "") + track));
+    if (artist) tries.push("/api/search?q=" + encodeURIComponent(track));
+    for (var i = 0; i < tries.length; i++) {
+      var list = await getJSON("https://lrclib.net" + tries[i]);
+      list = (list || []).filter(function (x) { return x.syncedLyrics && !x.instrumental; });
+      if (list.length) return list;
+    }
+    return [];
+  }
+  var lookupSeq = 0;
+  async function dropLink(text) {
+    var vid = vidOf(text), my = ++lookupSeq;
+    if (!vid) { status("That isn't a YouTube or YouTube Music link.", true); return; }
+    el("nolyr-actions").hidden = true;
+    var have = songById(vid);
+    if (have && have.lrc) { setSel({ type: "song", id: vid }); cueVideo(vid); status("Back on the setlist. Hit START.", false); return; }
+    var info = await videoInfo(vid);
+    if (my !== lookupSeq) return;
+    var who = splitTitle(info ? info.title : "", info ? info.author_name : "");
+    var s = have || { id: vid, vid: vid, name: who.track || "YouTube track", artist: who.artist || "", duration: 0, nudge: 0, lrc: null, lyricsId: null, thumb: "https://i.ytimg.com/vi/" + vid + "/mqdefault.jpg" };
+    s.name = s.name || who.track; s.artist = s.artist || who.artist;
+    songs = songs.filter(function (o) { return o.id !== vid; }); songs.unshift(s); saveSongs();
+    setSel({ type: "song", id: vid }); el("now-lyr").textContent = "Finding lyrics…"; el("now-lyr").className = "pill work";
+    status("");
+    var cued = cueVideo(vid);
+    try {
+      var cands = await findSynced(who.artist, who.track);
+      if (my !== lookupSeq) return;
+      if (!cands.length) { renderNow(); el("nolyr-actions").hidden = false; status("No synced lyrics for this one. Freestyle over it, or paste the lyrics.", true); return; }
+      await cued; var dur = await videoDuration(), best = cands[0];
+      if (dur) cands.forEach(function (c) { if (Math.abs(c.duration - dur) < Math.abs(best.duration - dur)) best = c; });
+      s.lrc = best.syncedLyrics; s.lyricsId = best.id; s.name = best.trackName; s.artist = best.artistName; s.duration = dur || best.duration;
+      s.drift = dur ? Math.abs(best.duration - dur) : 0; saveSongs(); renderLists(); renderNow();
+      status(s.drift > 6 ? "Lyrics found, but this upload's length is " + Math.round(s.drift) + " s off the album version. Use Lyrics sooner/later if they drift." : "Lyrics locked in. Hit START.", s.drift > 6 ? undefined : false);
+    } catch (e) { renderNow(); el("nolyr-actions").hidden = false; status("The lyrics library didn't answer. Paste the link again in a minute, or freestyle over it now.", true); }
+  }
+  el("link").addEventListener("change", function () { dropLink(el("link").value); });
+  el("link").addEventListener("keydown", function (e) { if (e.key === "Enter") dropLink(el("link").value); });
+  el("paste").addEventListener("click", async function () {
+    try { var t = await navigator.clipboard.readText(); if (t) { el("link").value = t; dropLink(t); return; } } catch (e) {}
+    el("link").focus(); status("Long-press the box and tap Paste.");
+  });
+  el("go-free").addEventListener("click", function () { mode = "free"; renderMode(); el("play").scrollIntoView({ block: "center", behavior: "smooth" }); status("Freestyle is set. Hit START.", false); });
+  el("go-own").addEventListener("click", function () { var s = sel && songById(sel.id); el("own").open = true; if (s) { el("own-name").value = s.name; el("own-artist").value = s.artist; el("own-link").value = "https://youtu.be/" + s.vid; } el("own-lyrics").focus(); });
+
+  /* ---------- make your own sync ---------- */
+  var sync = null;
+  el("own-save").addEventListener("click", function () {
+    var vid = vidOf(el("own-link").value), lines = el("own-lyrics").value.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    if (!vid) { status("Add the YouTube link for this one.", true); return; }
+    if (lines.length < 2) { status("Paste the lyrics, one line per bar.", true); return; }
+    var old = songById(vid) || {};
+    var s = { id: vid, vid: vid, name: el("own-name").value.trim() || old.name || "My track", artist: el("own-artist").value.trim() || old.artist || "", duration: old.duration || 0, nudge: 0, lrc: null, plain: lines, thumb: "https://i.ytimg.com/vi/" + vid + "/mqdefault.jpg" };
+    songs = songs.filter(function (o) { return o.id !== vid; }); songs.unshift(s); saveSongs();
+    el("own").open = false; el("own-lyrics").value = ""; setSel({ type: "song", id: vid }); cueVideo(vid);
+    if (mode === "free") { mode = "mic"; renderMode(); }
+    status("Saved. Hit START and tap once as each line starts.", false);
+  });
+  function syncStart(s) {
+    if (!yt.player || !yt.player.seekTo) { status("The video is still loading. Tap START again in a second.", true); cueVideo(s.vid); return; }
+    yt.player.seekTo(0, true); yt.player.playVideo();
+    sync = { song: s, stamps: [] };
+    show("game"); el("yt-box").hidden = false; el("nudge").hidden = true; el("sync-box").hidden = false; el("cv").parentNode.hidden = true; el("who").hidden = true;
+    document.querySelector("#game .hud").hidden = true; syncRender();
+  }
+  function syncRender() {
+    var L = sync.song.plain, i = sync.stamps.length, host = el("lyrics"); host.textContent = "";
+    var cur = document.createElement("span"); cur.className = "w now"; cur.textContent = i < L.length ? L[i] : "All lines stamped"; host.appendChild(cur);
+    if (i + 1 < L.length) { var nx = document.createElement("span"); nx.className = "next"; nx.textContent = L[i + 1]; host.appendChild(nx); }
+    el("sync-help").textContent = "Line " + Math.min(i + 1, L.length) + " of " + L.length + ". Tap right as the first word lands.";
+  }
+  function syncEnd(save) {
+    if (yt.player) yt.player.pauseVideo();
+    el("sync-box").hidden = true; el("cv").parentNode.hidden = false; document.querySelector("#game .hud").hidden = false;
+    if (save && sync.stamps.length >= 2) {
+      var two = function (n) { return (n < 10 ? "0" : "") + n; };
+      sync.song.lrc = sync.stamps.map(function (t, i) { var m = Math.floor(t / 60), sec = t - m * 60; return "[" + two(m) + ":" + (sec < 10 ? "0" : "") + sec.toFixed(2) + "] " + sync.song.plain[i]; }).join("\n");
+      sync.song.plain = sync.song.plain.slice(0, sync.stamps.length); saveSongs();
+      status("Synced " + sync.stamps.length + " lines. Hit START to rap it.", false);
+    }
+    sync = null; show("menu"); renderLists(); renderNow();
+  }
+  el("sync-tap").addEventListener("click", function () { if (!sync) return; if (sync.stamps.length < sync.song.plain.length) sync.stamps.push(ytNow()); if (sync.stamps.length >= sync.song.plain.length) syncEnd(true); else syncRender(); });
+  el("sync-undo").addEventListener("click", function () { if (sync && sync.stamps.length) { sync.stamps.pop(); syncRender(); } });
+  el("sync-done").addEventListener("click", function () { if (sync) syncEnd(true); });
+
+  /* ---------- game ---------- */
+  var canvas = el("cv"), cx = canvas.getContext("2d"), W = 0, H = 0;
+  function size() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = canvas.clientWidth || 360;
+    H = g && g.kind === "tap" ? Math.round(Math.min(window.innerHeight * (g.yt ? 0.44 : 0.6), 560)) : Math.round(g && g.yt ? Math.min(210, W * 0.55) : Math.min(330, W * 0.85));
+    canvas.style.height = H + "px"; canvas.width = W * dpr; canvas.height = H * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", function () { if (g) size(); });
+  function songTime() { if (g && g.yt) return ytNow() + g.nudge - offsetMs / 1000; return actx.currentTime - g.t0 - (actx.outputLatency || 0) - offsetMs / 1000; }
+  function show(id) { ["menu", "game", "pass", "results"].forEach(function (s) { el(s).hidden = s !== id; }); document.querySelector(".brand").hidden = id === "game"; window.scrollTo(0, 0); }
+  function micHint() { el("play").textContent = "Mic's live · tap to start"; status("Mic is live. Tap START.", false); }
+
+  async function start(player) {
+    ensureAudio();
+    var kind = mode, song = sel && sel.type === "song" ? songById(sel.id) : null, beat = sel && sel.type === "beat" ? beatById(sel.id) : null;
+    if (!song && !beat) { status("Drop a link or pick a track first.", true); return; }
+    if (song && !embeddable) { status("Real songs play in the Rap Hero app on your phone. Here, pick a house beat.", true); return; }
+    if (song && !song.lrc && song.plain && kind !== "free") { syncStart(song); return; }
+    if (song && !song.lrc && kind !== "free") { status("No lyrics for this one yet. Freestyle over it, or paste the lyrics.", true); el("nolyr-actions").hidden = false; return; }
+    if ((kind === "mic" || kind === "free") && !mic.an) {
+      var ok = await micOn();
+      if (ok && song) { micHint(); return; } // a second tap keeps the phone's permission to start the video
+      if (!ok && kind === "free") { status("Freestyle needs the mic.", true); return; }
+      if (!ok) { kind = "tap"; status("No mic, so this round is Tap.", true); }
+    }
+    if (song) { if (!yt.player || !yt.player.seekTo) { status("The video is still loading. Tap START again in a second.", true); cueVideo(song.vid); return; } yt.player.seekTo(0, true); yt.player.playVideo(); }
+    el("play").textContent = "Start";
+    var t = song ? { id: "song-" + song.id, name: song.name, song: song } : beat;
+    var chart = song ? (song.lrc ? songChart(song.lrc, kind === "tap" ? diff : "normal") : { notes: [], words: [], lines: [], eighth: 0.25, song: true }) : buildChart(beat, kind === "tap" ? diff : "normal");
+    var out = actx.createGain(); out.gain.value = 0.8; out.connect(actx.destination);
+    g = { kind: kind, player: player || 0, t: t, chart: chart, out: out, score: 0, combo: 0, best: 0, hype: 0.35, hypeUntil: -1, lastHit: -9,
+          counts: { perfect: 0, great: 0, good: 0, miss: 0 }, travel: diff === "hard" ? 1.15 : (diff === "easy" ? 1.9 : 1.5),
+          pops: [], flash: [0, 0, 0, 0], held: [false, false, false, false], onsets: [], over: false, yt: !!song, nudge: song ? song.nudge || 0 : 0 };
+    g.win = kind === "tap" ? WIN_TAP : (song ? WIN_SONG : WIN_MIC);
+    show("game"); el("yt-box").hidden = !song; el("nudge").hidden = !song || kind === "free"; showNudge(); size();
+    el("who").hidden = !battle; if (battle) el("who").textContent = "Player " + (g.player + 1) + " on the mic";
+    if (song) { var last = chart.lines[chart.lines.length - 1]; g.endAt = last ? Math.min(last.end, last.t + 6) + 2 : (song.duration || 600) + 1; }
+    else { g.t0 = actx.currentTime + 0.3 + 4 * 60 / beat.bpm; g.end = scheduleBeat(beat, g.t0, kind === "free" ? 16 : chart.lines.length, out); }
+    if (kind === "free") startRecording(song ? null : out);
+    if (kind === "mic") {
+      mic.listen = function (at) { if (!g) return; var st = songTime() - (actx.currentTime - at) - micOffset + (g.yt ? (actx.outputLatency || 0) : offsetMs / 1000 + (actx.outputLatency || 0)); g.onsets.push(st); judgeAt(st, null); };
+      g.sr = startSR();
+    }
+    renderLyrics(); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+  }
+
+  function mult() { return Math.min(4, 1 + Math.floor(g.combo / 10)) * (songTime() < g.hypeUntil ? 2 : 1); }
+  function judgeAt(at, lane) {
+    var win = g.win, best = null;
+    g.chart.notes.forEach(function (n) { if (!n.done && (lane === null || n.lane === lane) && Math.abs(n.t - at) <= win.good && (!best || Math.abs(n.t - at) < Math.abs(best.t - at))) best = n; });
+    if (!best) return;
+    if (lane === null && at < best.t - win.great) return; // an early breath or beat bleed doesn't burn the word
+    var dt = Math.abs(best.t - at), k = dt <= win.perfect ? "perfect" : (dt <= win.great ? "great" : "good"), now = songTime();
+    best.done = true; best.word.state = k === "perfect" ? "fire" : "hit"; best.judged = k; g.counts[k]++; g.combo++; g.best = Math.max(g.best, g.combo);
+    g.score += PTS[k] * mult(); g.lastHit = now;
+    g.hype = Math.min(1, g.hype + (k === "perfect" ? 0.05 : 0.03));
+    if (g.hype >= 1 && now >= g.hypeUntil) { g.hypeUntil = now + 8; g.hype = 0.5; g.pops.push({ text: "CROWD GOES WILD", lane: 1.5, t: now, c: cv("--hot"), big: true }); }
+    g.pops.push({ text: CALL[k], lane: lane === null ? 1.5 : lane, t: now, c: k === "perfect" ? cv("--gold") : (k === "great" ? cv("--fg") : cv("--cool")) });
+    if (lane !== null) blip(lane);
+    renderLyrics();
+  }
+  function tapLane(lane) { if (!g || g.kind !== "tap") return; g.held[lane] = true; g.flash[lane] = 1; judgeAt(songTime(), lane); }
+  function release(lane) { if (g) g.held[lane] = false; }
+
+  function frame() {
+    if (!g) return;
+    var now = songTime(), changed = false;
+    if (g.kind !== "free") g.chart.notes.forEach(function (n) { if (!n.done && now - n.t > g.win.good) { n.done = true; n.word.state = "miss"; g.counts.miss++; g.combo = 0; g.hype = Math.max(0, g.hype - 0.07); changed = true; } });
+    if (changed) renderLyrics();
+    var wild = now < g.hypeUntil;
+    el("score").textContent = g.kind === "free" ? "REC" : g.score.toLocaleString("en-US");
+    el("mult").textContent = g.kind === "free" ? "—" : (g.combo + (mult() > 1 ? " · x" + mult() : ""));
+    el("crowd").style.width = Math.round((wild ? (g.hypeUntil - now) / 8 : g.hype) * 100) + "%";
+    el("crowdbar").className = "crowdbar" + (wild ? " hype" : "");
+    if (g.kind === "tap") drawHighway(now); else drawStage(now);
+    if (!g.yt && now < 0) { var beat = 60 / g.t.bpm; cx.fillStyle = cv("--fg"); cx.font = "72px Anton, Impact, sans-serif"; cx.textAlign = "center"; cx.textBaseline = "middle"; cx.fillText(String(Math.min(4, Math.ceil(-now / beat))), W / 2, H * 0.4); }
+    if (g.yt ? (now > g.endAt || yt.state === 0) : actx.currentTime > g.end) { finish(); return; }
+    raf = requestAnimationFrame(frame);
+  }
+  function energy(now) { if (now < g.hypeUntil) return 1; return Math.min(1, g.hype * 0.8 + Math.max(0, 0.5 - (now - g.lastHit)) ); }
+
+  // Flow lane + crowd: words slide toward the mic; your voice shows as red ticks; the crowd moves with you.
+  function drawStage(now) {
+    var en = energy(now), nowX = W * 0.22, pps = Math.max(110, W * 0.4), mid = H * (g.yt ? 0.36 : 0.3);
+    var bg = cx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#1a1520"); bg.addColorStop(1, "#08070a"); cx.fillStyle = bg; cx.fillRect(0, 0, W, H);
+    // spotlights
+    [[W * 0.15, cv("--gold")], [W * 0.85, cv("--hot")]].forEach(function (s, i) {
+      var sway = Math.sin(now * (0.7 + i * 0.3) + i) * W * 0.18;
+      cx.globalAlpha = 0.07 + en * 0.16; cx.fillStyle = s[1];
+      cx.beginPath(); cx.moveTo(s[0] - 6, 0); cx.lineTo(s[0] + 6, 0); cx.lineTo(s[0] + sway + W * 0.22, H); cx.lineTo(s[0] + sway - W * 0.22, H); cx.closePath(); cx.fill();
+    });
+    cx.globalAlpha = 1;
+    if (g.kind === "mic") {
+      // lane
+      cx.fillStyle = "rgba(0,0,0,.35)"; cx.fillRect(0, mid - 26, W, 52);
+      var e = g.chart.eighth;
+      g.chart.notes.forEach(function (n) {
+        var x = nowX + (n.t - now) * pps, w = Math.max(22, Math.min(e * pps * 0.9, 90)); if (x + w < 0 || x > W) return;
+        var st = n.word.state, fill = st === "fire" ? cv("--gold") : st === "hit" ? (n.judged === "great" ? cv("--fg") : cv("--cool")) : st === "miss" ? "#4a2430" : null;
+        rr(x - 4, mid - 15, w, 30, 9);
+        if (fill) { cx.fillStyle = fill; cx.fill(); } else { cx.fillStyle = "#211c27"; cx.fill(); cx.lineWidth = 2; cx.strokeStyle = cv("--gold-deep"); cx.stroke(); }
+        cx.fillStyle = fill && st !== "miss" ? cv("--bg") : (st === "miss" ? "#b36a7b" : cv("--fg")); cx.font = "600 12px Rubik, sans-serif"; cx.textAlign = "left"; cx.textBaseline = "middle";
+        cx.fillText(n.word.text.replace(/-$/, ""), x + 3, mid + 1, w - 8);
+      });
+      cx.strokeStyle = cv("--hot"); cx.lineWidth = 3;
+      g.onsets.forEach(function (o) { var x = nowX + (o - now) * pps; if (x < -4 || x > W) return; cx.beginPath(); cx.moveTo(x, mid + 20); cx.lineTo(x, mid + 32); cx.stroke(); });
+      // the mic at the now line
+      cx.fillStyle = cv("--gold"); cx.globalAlpha = 0.25 + en * 0.5; cx.fillRect(nowX - 1.5, mid - 30, 3, 60); cx.globalAlpha = 1;
+      mic3(nowX, mid - 40, en);
+      pops(now, function (q) { return [Math.min(W - 70, nowX + 70), mid - 44 - (q.big ? 4 : 0)]; });
+    } else {
+      cx.fillStyle = cv("--dim"); cx.font = "600 15px Rubik, sans-serif"; cx.textAlign = "center"; cx.textBaseline = "middle";
+      cx.fillText("Freestyle. Your bars. Recording.", W / 2, mid);
+      mic3(W / 2, mid - 46, 0.6 + mic.level * 8);
+    }
+    crowd(now, en, H);
+    // mic level
+    var lv = Math.min(1, mic.level * 9); cx.fillStyle = "rgba(255,255,255,.08)"; cx.fillRect(W - 10, 10, 4, H * 0.5); cx.fillStyle = cv("--good"); cx.fillRect(W - 10, 10 + H * 0.5 * (1 - lv), 4, H * 0.5 * lv);
+  }
+  function mic3(x, y, en) {
+    cx.save(); cx.translate(x, y);
+    cx.shadowColor = cv("--gold"); cx.shadowBlur = 8 + en * 18;
+    cx.fillStyle = cv("--gold"); cx.beginPath(); cx.arc(0, 0, 9, 0, Math.PI * 2); cx.fill();
+    cx.shadowBlur = 0; cx.fillStyle = "#1a1520"; for (var i = -1; i <= 1; i++) { cx.fillRect(-6, i * 3.5 - 0.5, 12, 1.2); }
+    cx.fillStyle = cv("--gold-deep"); cx.fillRect(-2.5, 9, 5, 12);
+    cx.restore();
+  }
+  function crowd(now, en, h) {
+    var n = Math.max(9, Math.round(W / 34)), base = h + 6, wild = now < g.hypeUntil;
+    for (var i = 0; i < n; i++) {
+      var x = (i + 0.5) * W / n + Math.sin(i * 12.9) * 6, ph = now * (2.2 + (i % 3) * 0.35) * 2 + i * 1.7;
+      var jump = Math.max(0, Math.sin(ph)) * (2 + en * 14), row = i % 2 ? 0 : 10, y = base - row - jump;
+      cx.fillStyle = "#0d0b10"; cx.strokeStyle = en > 0.6 ? "rgba(242,193,78,.55)" : "rgba(255,255,255,.08)"; cx.lineWidth = 1.5;
+      cx.beginPath(); cx.ellipse(x, y - 10, 15, 18, 0, Math.PI, 0); cx.fill(); cx.stroke();
+      cx.beginPath(); cx.arc(x, y - 33, 8.5, 0, Math.PI * 2); cx.fill(); cx.stroke();
+      if (wild || en > 0.75) { var up = (i % 2 ? -1 : 1) * 4; cx.beginPath(); cx.moveTo(x - 10, y - 22); cx.lineTo(x - 15 + up, y - 52 - jump * 0.5); cx.moveTo(x + 10, y - 22); cx.lineTo(x + 15 - up, y - 52 - jump * 0.5); cx.lineWidth = 3.5; cx.strokeStyle = "#0d0b10"; cx.stroke(); }
+    }
+  }
+  function drawHighway(now) {
+    var laneW = W / 4, hitY = H - 70, speed = hitY / g.travel, beat = g.t.bpm ? 60 / g.t.bpm : 0;
+    cx.fillStyle = "#0e0c12"; cx.fillRect(0, 0, W, H);
+    for (var i = 0; i < 4; i++) { cx.globalAlpha = 0.06 + g.flash[i] * 0.2; cx.fillStyle = cv(LANES[i]); cx.fillRect(i * laneW + 2, 0, laneW - 4, H); g.flash[i] *= 0.86; }
+    cx.globalAlpha = 1; cx.strokeStyle = cv("--line"); cx.lineWidth = 1;
+    if (beat) for (var bt = Math.ceil(now / beat) * beat; bt < now + g.travel; bt += beat) { var by = hitY - (bt - now) * speed; cx.globalAlpha = Math.round(bt / beat) % 4 === 0 ? 0.9 : 0.35; cx.beginPath(); cx.moveTo(0, by); cx.lineTo(W, by); cx.stroke(); }
+    cx.globalAlpha = 1; cx.textAlign = "center"; cx.textBaseline = "middle";
+    for (var p = 0; p < 4; p++) {
+      var c = p * laneW + laneW / 2, col = cv(LANES[p]);
+      cx.lineWidth = 4; cx.strokeStyle = col; cx.fillStyle = g.held[p] ? col : cv("--bg");
+      cx.beginPath(); cx.arc(c, hitY, Math.min(28, laneW * 0.3), 0, Math.PI * 2); cx.fill(); cx.stroke();
+    }
+    g.chart.notes.forEach(function (n) {
+      if (n.done) return; var y = hitY - (n.t - now) * speed; if (y < -40 || y > H + 40) return;
+      var c = n.lane * laneW + laneW / 2, wd = laneW - 12;
+      cx.fillStyle = cv(LANES[n.lane]); rr(c - wd / 2, y - 16, wd, 32, 9); cx.fill();
+      cx.fillStyle = cv("--bg"); cx.font = "700 " + Math.max(10, Math.min(14, wd / Math.max(4, n.word.text.length) * 1.6)) + "px Rubik, sans-serif";
+      cx.fillText(n.word.text.replace(/-$/, ""), c, y + 1, wd - 8);
+    });
+    pops(now, function (q) { return [q.lane * laneW + laneW / 2, hitY - 50]; });
+  }
+  function pops(now, at) {
+    g.pops = g.pops.filter(function (q) { return now - q.t < (q.big ? 1.2 : 0.55); });
+    g.pops.forEach(function (q) { var life = q.big ? 1.2 : 0.55, a = 1 - (now - q.t) / life, p = at(q); cx.globalAlpha = a; cx.fillStyle = q.c; cx.font = (q.big ? 26 : 20) + "px Anton, Impact, sans-serif"; cx.textAlign = "center"; cx.textBaseline = "middle"; cx.fillText(q.text, q.big ? W / 2 : p[0], p[1] - (1 - a) * 22); });
+    cx.globalAlpha = 1;
+  }
+  function rr(x, y, w, h, r) { cx.beginPath(); cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r); cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath(); }
+
+  function renderLyrics() {
+    var host = el("lyrics"); host.textContent = "";
+    if (!g) return;
+    if (g.kind === "free") { host.textContent = "Freestyle over " + g.t.name; return; }
+    if (!g.chart.lines.length) return;
+    var now = songTime(), b = 0;
+    g.chart.lines.forEach(function (ln, i) { if (ln.t <= now + 0.15) b = i; });
+    function line(idx, cls) {
+      var span = document.createElement("span"); if (cls) span.className = cls;
+      var ws = g.chart.words.filter(function (w) { return w.bar === idx; });
+      ws.forEach(function (w, i) {
+        var s = document.createElement("span"), cur = !cls && now >= w.t - 0.05 && (i === ws.length - 1 || now < ws[i + 1].t - 0.05) && !w.state;
+        s.className = "w " + (w.state === "auto" ? "hit" : (cur ? "now" : w.state));
+        s.textContent = w.text.replace(/-$/, "") + (w.join || i === ws.length - 1 ? "" : " "); span.appendChild(s);
+      });
+      return span;
+    }
+    host.appendChild(line(b)); if (b + 1 < g.chart.lines.length) host.appendChild(line(b + 1, "next"));
+  }
+  setInterval(function () { if (g && !el("game").hidden) renderLyrics(); }, 110);
+
+  function startRecording(beatOut) {
+    if (!window.MediaRecorder || !mic.src) return;
+    var dest = actx.createMediaStreamDestination(); if (beatOut) beatOut.connect(dest); mic.src.connect(dest);
+    var chunks = [], r; try { r = new MediaRecorder(dest.stream); } catch (e) { return; }
+    r.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+    r.onstop = function () { try { mic.src.disconnect(dest); } catch (e) {} var url = URL.createObjectURL(new Blob(chunks, { type: r.mimeType || "audio/webm" })); el("rec-audio").src = url; el("rec-save").href = url; };
+    r.start(); g.rec = r;
+  }
+
+  /* ---------- finish ---------- */
+  function finish() {
+    cancelAnimationFrame(raf); g.over = true; mic.listen = null;
+    var res = { kind: g.kind, t: g.t, score: g.score, best: g.best, counts: g.counts, chart: g.chart };
+    if (g.sr) { g.sr.stop(); var want = lyricWords(g.chart), got = norm(g.sr.text); res.lyr = want.length ? lcs(want, got) / want.length : null; }
+    if (g.rec) { try { g.rec.stop(); } catch (e) {} }
+    try { g.out.disconnect(); } catch (e) {}
+    if (g.yt && yt.player) yt.player.pauseVideo();
+    var player = g.player; g = null;
+    if (battle) { battle.scores[player] = res; if (player === 0) { el("pass-sub").textContent = "Player 1 put up " + res.score.toLocaleString("en-US") + ". Same track. Your turn."; show("pass"); return; } }
+    showResults(res);
+  }
+  function starsOf(c) {
+    var tot = c.perfect + c.great + c.good + c.miss, acc = tot ? (c.perfect + c.great * 0.75 + c.good * 0.45) / tot : 0;
+    return acc >= 0.92 ? 5 : acc >= 0.8 ? 4 : acc >= 0.65 ? 3 : acc >= 0.45 ? 2 : 1;
+  }
+  var TITLES = ["", "Booed off stage", "Open mic", "Opening act", "Headliner", "Mic legend"];
+  function showResults(res) {
+    show("results");
+    var free = res.kind === "free";
+    el("rec-box").hidden = !free; el("res-grid").hidden = free; el("stars").hidden = free; el("newbest").hidden = true;
+    el("res-title").textContent = res.t.name + " · " + (free ? "freestyle" : res.kind === "mic" ? "on the mic" : "tap · " + diff);
+    el("rank").textContent = free ? "That's a take" : TITLES[starsOf(res.counts)];
+    el("res-battle").hidden = !battle;
+    if (battle) {
+      var a = battle.scores[0].score, b = res.score;
+      el("res-battle").textContent = a === b ? "Dead even. Run it back." : (a > b ? "Player 1 takes it " : "Player 2 takes it ") + Math.max(a, b).toLocaleString("en-US") + " to " + Math.min(a, b).toLocaleString("en-US");
+    }
+    if (free) { battle = null; renderLists(); return; }
+    var c = res.counts, tot = c.perfect + c.great + c.good + c.miss, st = starsOf(c), sh = el("stars"); sh.textContent = "";
+    for (var i = 1; i <= 5; i++) { var s = document.createElement("span"); s.textContent = "★"; if (i > st) s.className = "off"; sh.appendChild(s); }
+    el("r-score").textContent = res.score.toLocaleString("en-US");
+    el("r-acc").textContent = Math.round((tot ? (c.perfect + c.great + c.good) / tot : 0) * 100) + "%";
+    el("r-combo").textContent = res.best; el("r-perf").textContent = c.perfect + " / " + c.great + " / " + c.good + " / " + c.miss;
+    el("r-lyr-box").hidden = res.lyr == null; if (res.lyr != null) el("r-lyr").textContent = Math.round(res.lyr * 100) + "%";
+    if (!battle) { var key = bestKey(res.t, res.kind), prev = +(store(key) || 0); el("newbest").hidden = res.score <= prev; if (res.score > prev) store(key, String(res.score)); }
+    renderLists();
+  }
+  function bestKey(t, kind) { return "rh-best-" + (t.song ? "song-" + t.song.id : t.id) + "-" + (kind === "tap" ? "tap-" + diff : kind); }
+  function quit() {
+    if (sync) { syncEnd(false); return; }
+    if (g) { g.over = true; mic.listen = null; if (g.sr) g.sr.stop(); if (g.rec) try { g.rec.stop(); } catch (e) {} try { g.out.disconnect(); } catch (e) {} if (g.yt && yt.player) yt.player.pauseVideo(); }
+    cancelAnimationFrame(raf); g = null; battle = null; show("menu");
+  }
+
+  /* ---------- home ---------- */
+  function thumbFor(item) {
+    var d = document.createElement("div"); d.className = "thumb";
+    if (item.vid) d.style.backgroundImage = "url(" + JSON.stringify(item.thumb || "https://i.ytimg.com/vi/" + item.vid + "/mqdefault.jpg") + ")";
+    else { d.className = "thumb disc"; d.style.setProperty("--c", item.c); }
+    return d;
+  }
+  function renderNow() {
+    var song = sel && sel.type === "song" ? songById(sel.id) : null, beat = sel && sel.type === "beat" ? beatById(sel.id) : null, it = song || beat;
+    el("now-card").hidden = !it; if (!it) return;
+    var th = el("now-thumb"); th.className = "thumb"; th.style.backgroundImage = ""; th.style.removeProperty("--c");
+    if (song) th.style.backgroundImage = "url(" + JSON.stringify(song.thumb || "https://i.ytimg.com/vi/" + song.vid + "/mqdefault.jpg") + ")"; else { th.className = "thumb disc"; th.style.setProperty("--c", beat.c); }
+    el("now-title").textContent = it.name;
+    el("now-artist").textContent = song ? (song.artist || "YouTube") + (song.duration ? " · " + fmtDur(song.duration) : "") : beat.bpm + " BPM · " + beat.blurb;
+    var p = el("now-lyr");
+    if (beat) { p.textContent = "House beat · lyrics built in"; p.className = "pill ok"; }
+    else if (song.lrc) { p.textContent = song.plain ? "Your sync" : "Synced lyrics"; p.className = "pill ok"; }
+    else if (song.plain) { p.textContent = "Lyrics saved · needs a sync"; p.className = "pill work"; }
+    else { p.textContent = "No lyrics yet"; p.className = "pill bad"; }
+  }
+  function item(it, pressed, sub, best, onPick, onDel) {
+    var b = document.createElement("div"); b.className = "item"; b.setAttribute("role", "button"); b.tabIndex = 0; b.setAttribute("aria-pressed", pressed ? "true" : "false");
+    b.appendChild(thumbFor(it));
+    var m = document.createElement("div"), nm = document.createElement("b"), sm = document.createElement("small"); m.className = "meta";
+    nm.textContent = it.name; sm.textContent = sub; m.appendChild(nm); m.appendChild(sm); b.appendChild(m);
+    if (best) { var bs = document.createElement("span"); bs.className = "best"; bs.textContent = best; b.appendChild(bs); }
+    if (onDel) { var x = document.createElement("button"); x.className = "del"; x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "Remove " + it.name); x.addEventListener("click", function (e) { e.stopPropagation(); onDel(); }); b.appendChild(x); }
+    b.addEventListener("click", onPick); b.addEventListener("keydown", function (e) { if (e.key === "Enter") onPick(); });
+    return b;
+  }
+  function bestLabel(t) { var v = +(store(bestKey(t, mode)) || 0); return v ? v.toLocaleString("en-US") : ""; }
+  function renderLists() {
+    var host = el("my-songs"); host.textContent = "";
+    if (!songs.length) { var p = document.createElement("div"); p.className = "empty"; p.textContent = embeddable ? "Songs you drop in land here." : "Real songs play in the Rap Hero app on your phone."; host.appendChild(p); }
+    songs.forEach(function (s) {
+      var sub = (s.artist || "YouTube") + (s.lrc ? "" : s.plain ? " · needs a sync" : " · no lyrics");
+      host.appendChild(item(s, sel && sel.type === "song" && sel.id === s.id, sub, bestLabel({ song: s }),
+        function () { setSel({ type: "song", id: s.id }); cueVideo(s.vid); el("nolyr-actions").hidden = !!(s.lrc || s.plain); status(s.lrc ? "Queued. Hit START." : ""); window.scrollTo({ top: 0, behavior: "smooth" }); },
+        function () { songs = songs.filter(function (o) { return o.id !== s.id; }); saveSongs(); if (sel && sel.id === s.id) setSel(null); else renderLists(); }));
+    });
+    var bh = el("tracks"); bh.textContent = "";
+    TRACKS.forEach(function (t) {
+      bh.appendChild(item(t, sel && sel.type === "beat" && sel.id === t.id, t.bpm + " BPM · " + t.blurb, bestLabel(t),
+        function () { setSel({ type: "beat", id: t.id }); el("nolyr-actions").hidden = true; status("Queued. Hit START."); window.scrollTo({ top: 0, behavior: "smooth" }); }));
+    });
+  }
+  function renderMode() {
+    document.querySelectorAll("#mode button").forEach(function (x) { x.setAttribute("aria-pressed", x.getAttribute("data-m") === mode ? "true" : "false"); });
+    el("diff-row").hidden = mode !== "tap"; el("battle-row").hidden = mode === "free";
+    if (mode === "free") el("battle").checked = false;
+    store("rh-mode", mode); renderLists();
+  }
+  document.querySelectorAll("#mode button").forEach(function (b) { b.addEventListener("click", function () { mode = b.getAttribute("data-m"); renderMode(); }); });
+  document.querySelectorAll("#diff button").forEach(function (b) { b.addEventListener("click", function () { diff = b.getAttribute("data-d"); document.querySelectorAll("#diff button").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); }); renderLists(); }); });
+  el("off").value = offsetMs; el("off-v").textContent = offsetMs + " ms";
+  el("off").addEventListener("input", function () { offsetMs = +el("off").value; el("off-v").textContent = offsetMs + " ms"; store("rh-offset", String(offsetMs)); });
+  el("mic-on").addEventListener("click", function () { micOn(); });
+  el("calib").addEventListener("click", calibrate);
+  if (!SR) el("lyr-check").disabled = true;
+  function showNudge() { if (g) el("nudge-v").textContent = (g.nudge >= 0 ? "+" : "") + g.nudge.toFixed(2) + " s"; }
+  function nudge(d) { if (!g || !g.yt) return; g.nudge = Math.round((g.nudge + d) * 100) / 100; showNudge(); var s = g.t.song; if (s) { s.nudge = g.nudge; saveSongs(); } }
+  el("nudge-m").addEventListener("click", function () { nudge(-0.25); });
+  el("nudge-p").addEventListener("click", function () { nudge(0.25); });
+  function go() { battle = el("battle").checked && mode !== "free" ? { scores: [] } : null; start(0); }
+  el("play").addEventListener("click", go);
+  el("again").addEventListener("click", go);
+  el("pass-go").addEventListener("click", function () { start(1); });
+  el("tomenu").addEventListener("click", function () { battle = null; show("menu"); });
+  el("quit").addEventListener("click", quit);
+
+  /* ---------- input ---------- */
+  document.addEventListener("keydown", function (e) { var k = KEYS[e.key.toLowerCase()]; if (k === undefined || !g || e.repeat) return; e.preventDefault(); tapLane(k); });
+  document.addEventListener("keyup", function (e) { var k = KEYS[e.key.toLowerCase()]; if (k !== undefined) release(k); });
+  var touchLane = {};
+  canvas.addEventListener("pointerdown", function (e) { if (!g || g.kind !== "tap") return; e.preventDefault(); var r = canvas.getBoundingClientRect(), lane = Math.max(0, Math.min(3, Math.floor((e.clientX - r.left) / r.width * 4))); touchLane[e.pointerId] = lane; tapLane(lane); });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) { canvas.addEventListener(ev, function (e) { if (touchLane[e.pointerId] !== undefined) { release(touchLane[e.pointerId]); delete touchLane[e.pointerId]; } }); });
+
+  window.__rapHero = { state: function () { return g; }, now: function () { return g ? songTime() : 0; }, voice: function (t) { if (g && g.kind === "mic") { g.onsets.push(t); judgeAt(t, null); } } };
+
+  /* ---------- boot ---------- */
+  if (!hasMicAPI) { if (mode !== "tap") mode = "tap"; document.querySelector('#mode button[data-m="mic"]').disabled = true; document.querySelector('#mode button[data-m="free"]').disabled = true; el("mic-stat").textContent = "The mic works in the Rap Hero app on your phone. This view is tap only."; el("mic-on").disabled = true; }
+  if (!embeddable) { el("link").disabled = true; el("paste").disabled = true; el("link-hint").textContent = "Dropping YouTube links works in the Rap Hero app on your phone. Here, pick a house beat below."; }
+  if (!sel || (sel.type === "song" && !songById(sel.id)) || (sel.type === "song" && !embeddable)) sel = { type: "beat", id: TRACKS[0].id };
+  renderMode(); renderNow();
+  if (sel.type === "song") { var sv = songById(sel.id); if (sv) cueVideo(sv.vid); }
+  // shared from the YouTube app (Android share sheet) or opened with ?url=
+  try {
+    var qs = new URLSearchParams(location.search), shared = qs.get("url") || qs.get("text") || qs.get("title") || qs.get("v");
+    if (shared && embeddable) { el("link").value = shared; dropLink(shared); history.replaceState(null, "", location.pathname); }
+  } catch (e) {}
+  if (embeddable && "serviceWorker" in navigator && location.protocol === "https:") { navigator.serviceWorker.register("sw.js").catch(function () {}); }
+})();
+</script>
+</body></html>
