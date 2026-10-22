@@ -148,6 +148,7 @@ audio { width: 100%; margin-top: 12px; }
       <div class="row" id="nolyr-actions" style="margin-top:10px" hidden>
         <button class="btn" id="go-free">Freestyle over it</button>
         <button class="btn" id="go-own">Paste the lyrics</button>
+        <a class="btn" id="go-genius" target="_blank" rel="noopener" style="text-decoration:none">Find them on Genius</a>
       </div>
     </div>
 
@@ -183,6 +184,7 @@ audio { width: 100%; margin-top: 12px; }
       <p class="hint">For freestyles and tracks the lyrics library doesn't have. Paste them one line per bar, then tap each line in time while the video plays. It saves on this phone.</p>
       <div class="row" style="margin-top:8px"><input type="search" id="own-name" class="grow" placeholder="Title"><input type="search" id="own-artist" class="grow" placeholder="Artist"></div>
       <div class="row" style="margin-top:8px"><input type="url" id="own-link" class="grow" placeholder="YouTube or YouTube Music link"></div>
+      <div class="row" style="margin-top:8px"><a class="btn" id="own-genius" target="_blank" rel="noopener" style="text-decoration:none">Find the lyrics on Genius</a></div>
       <textarea id="own-lyrics" rows="7" placeholder="Paste lyrics, one line per bar" style="margin-top:8px"></textarea>
       <div class="row" style="margin-top:8px"><button class="btn gold" id="own-save">Save, then sync it</button></div>
     </details>
@@ -565,7 +567,7 @@ audio { width: 100%; margin-top: 12px; }
     el("link").focus(); status("Long-press the box and tap Paste.");
   });
   el("go-free").addEventListener("click", function () { mode = "free"; renderMode(); el("play").scrollIntoView({ block: "center", behavior: "smooth" }); status("Freestyle is set. Hit START.", false); });
-  el("go-own").addEventListener("click", function () { var s = sel && songById(sel.id); el("own").open = true; if (s) { el("own-name").value = s.name; el("own-artist").value = s.artist; el("own-link").value = "https://youtu.be/" + s.vid; } el("own-lyrics").focus(); });
+  el("go-own").addEventListener("click", function () { var s = sel && songById(sel.id); el("own").open = true; if (s) { el("own-name").value = s.name; el("own-artist").value = s.artist; el("own-link").value = "https://youtu.be/" + s.vid; } el("own-lyrics").focus(); el("own-genius").href = geniusUrl(el("own-name").value, el("own-artist").value); });
 
   /* ---------- make your own sync ---------- */
   var sync = null;
@@ -857,7 +859,10 @@ audio { width: 100%; margin-top: 12px; }
     else { d.className = "thumb disc"; d.style.setProperty("--c", item.c); }
     return d;
   }
+  function geniusUrl(name, artist) { return "https://genius.com/search?q=" + encodeURIComponent(((artist && !/productions|records|music|tv|official/i.test(artist) ? artist + " " : "") + (name || "")).trim()); }
   function renderNow() {
+    var gs = sel && sel.type === "song" ? songById(sel.id) : null;
+    if (gs) { var gu = geniusUrl(gs.name, gs.artist); el("go-genius").href = gu; el("own-genius").href = gu; }
     var song = sel && sel.type === "song" ? songById(sel.id) : null, beat = sel && sel.type === "beat" ? beatById(sel.id) : null, it = song || beat;
     el("now-card").hidden = !it; if (!it) return;
     var th = el("now-thumb"); th.className = "thumb"; th.style.backgroundImage = ""; th.style.removeProperty("--c");
