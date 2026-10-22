@@ -571,8 +571,24 @@ audio { width: 100%; margin-top: 12px; }
 
   /* ---------- make your own sync ---------- */
   var sync = null;
+  // "Select all" on a lyrics site brings the whole page. Keep only the lyric lines: start after the
+  // "<song> Lyrics" heading, stop at the site's footer blocks, drop [Section] tags, credits and ad-libs.
+  function cleanLyrics(raw) {
+    var L = String(raw || "").replace(/\r/g, "").split("\n").map(function (l) { return l.trim(); });
+    var start = 0, end = L.length;
+    for (var i = 0; i < L.length; i++) if (/\S\s+Lyrics$/.test(L[i]) && !/^(Read More|Translations)$/i.test(L[i])) { start = i + 1; break; }
+    for (var j = start; j < L.length; j++) if (/^(You might also like|\d*\s*Embed|Embed|About|Song Bio|Credits|Comments|Q&A|Released on)$/i.test(L[j])) { end = j; break; }
+    return L.slice(start, end).filter(function (l) {
+      if (!l || /^\[.*\]$/.test(l) || /^\d+(\.\d+)?K?$/.test(l)) return false;
+      if (/^Part [IVX\d]+[:.]/i.test(l) || /^(Translations|Read More|Sign Up|Share|Embed)$/i.test(l)) return false;
+      return true;
+    }).map(function (l) { return l.replace(/\s*\([^)]*\)\s*$/g, "").replace(/\s{2,}/g, " ").trim(); }).filter(Boolean);
+  }
+  el("own-lyrics").addEventListener("paste", function () {
+    setTimeout(function () { var raw = el("own-lyrics").value, lines = cleanLyrics(raw); if (lines.length && lines.join("\n") !== raw.trim()) { el("own-lyrics").value = lines.join("\n"); status("Cleaned up the page: kept " + lines.length + " lyric lines.", false); } }, 0);
+  });
   el("own-save").addEventListener("click", function () {
-    var vid = vidOf(el("own-link").value), lines = el("own-lyrics").value.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var vid = vidOf(el("own-link").value), lines = cleanLyrics(el("own-lyrics").value);
     if (!vid) { status("Add the YouTube link for this one.", true); return; }
     if (lines.length < 2) { status("Paste the lyrics, one line per bar.", true); return; }
     var old = songById(vid) || {};
