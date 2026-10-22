@@ -187,6 +187,7 @@ audio { width: 100%; margin-top: 12px; }
       <div class="row" style="margin-top:8px"><a class="btn" id="own-genius" target="_blank" rel="noopener" style="text-decoration:none">Find the lyrics on Genius</a></div>
       <textarea id="own-lyrics" rows="7" placeholder="Paste lyrics, one line per bar" style="margin-top:8px"></textarea>
       <div class="row" style="margin-top:8px"><button class="btn gold" id="own-save">Save, then sync it</button></div>
+      <div class="status" id="own-stat" style="text-align:left;margin-top:8px"></div>
     </details>
 
     <details class="card" id="settings">
@@ -588,15 +589,28 @@ audio { width: 100%; margin-top: 12px; }
     setTimeout(function () { var raw = el("own-lyrics").value, lines = cleanLyrics(raw); if (lines.length && lines.join("\n") !== raw.trim()) { el("own-lyrics").value = lines.join("\n"); status("Cleaned up the page: kept " + lines.length + " lyric lines.", false); } }, 0);
   });
   el("own-save").addEventListener("click", function () {
-    var vid = vidOf(el("own-link").value), lines = cleanLyrics(el("own-lyrics").value);
-    if (!vid) { status("Add the YouTube link for this one.", true); return; }
-    if (lines.length < 2) { status("Paste the lyrics, one line per bar.", true); return; }
+    var cur = sel && sel.type === "song" ? songById(sel.id) : null;
+    var vid = vidOf(el("own-link").value) || (cur ? cur.vid : null), lines = cleanLyrics(el("own-lyrics").value);
+    var say = function (m, bad) { var o = el("own-stat"); o.textContent = m; o.className = "status " + (bad ? "bad" : "ok"); };
+    if (!vid) { say("Add the YouTube link for this one (or drop the link at the top first).", true); return; }
+    if (lines.length < 2) { say("Didn't find lyric lines in what you pasted. Paste the lyrics, one line per bar.", true); return; }
     var old = songById(vid) || {};
     var s = { id: vid, vid: vid, name: el("own-name").value.trim() || old.name || "My track", artist: el("own-artist").value.trim() || old.artist || "", duration: old.duration || 0, nudge: 0, lrc: null, plain: lines, thumb: "https://i.ytimg.com/vi/" + vid + "/mqdefault.jpg" };
     songs = songs.filter(function (o) { return o.id !== vid; }); songs.unshift(s); saveSongs();
     el("own").open = false; el("own-lyrics").value = ""; setSel({ type: "song", id: vid }); cueVideo(vid);
     if (mode === "free") { mode = "mic"; renderMode(); }
-    status("Saved. Hit START and tap once as each line starts.", false);
+    if (!songById(vid)) { say("Couldn't save on this phone. Check that Chrome isn't in Incognito.", true); return; }
+    say("Saved " + lines.length + " lines.", false);
+    status("Saved " + lines.length + " lines. Hit START and tap once as each line starts.", false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  // opening the form directly fills it from the queued song
+  el("own").addEventListener("toggle", function () {
+    if (!el("own").open) return; var cur = sel && sel.type === "song" ? songById(sel.id) : null; if (!cur) return;
+    if (!el("own-link").value) el("own-link").value = "https://youtu.be/" + cur.vid;
+    if (!el("own-name").value) el("own-name").value = cur.name || "";
+    if (!el("own-artist").value) el("own-artist").value = cur.artist || "";
+    el("own-genius").href = geniusUrl(el("own-name").value, el("own-artist").value);
   });
   function syncStart(s) {
     if (!yt.player || !yt.player.seekTo) { status("The video is still loading. Tap START again in a second.", true); cueVideo(s.vid); return; }
