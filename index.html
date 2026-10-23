@@ -225,6 +225,7 @@ audio { width: 100%; margin-top: 12px; }
       <div class="row"><button class="btn" id="sync-undo" style="flex:1">Undo</button><button class="btn" id="sync-done" style="flex:1">Finish sync</button></div>
       <div class="status" id="sync-help"></div>
     </div>
+    <button class="btn gold" id="skip" hidden>Lyrics done · see results</button>
     <button class="btn" id="quit">Leave the stage</button>
   </section>
 
@@ -677,7 +678,11 @@ audio { width: 100%; margin-top: 12px; }
     g.win = kind === "tap" ? WIN_TAP : (song ? WIN_SONG : WIN_MIC);
     show("game"); el("yt-box").hidden = !song; el("nudge").hidden = !song || kind === "free"; showNudge(); size();
     el("who").hidden = !battle; if (battle) el("who").textContent = "Player " + (g.player + 1) + " on the mic";
-    if (song) { var last = chart.lines[chart.lines.length - 1]; g.endAt = last ? Math.min(last.end, last.t + 6) + 2 : (song.duration || 600) + 1; }
+    if (song) {
+      var last = chart.lines[chart.lines.length - 1], dur = (yt.player && yt.player.getDuration && yt.player.getDuration()) || song.duration || 0;
+      g.lyricsEnd = last ? Math.min(last.end, last.t + 6) : 0;
+      g.endAt = dur ? dur + 1 : Math.max(g.lyricsEnd + 2, 600);   // the song plays to the end; results when it finishes
+    }
     else { g.t0 = actx.currentTime + 0.3 + 4 * 60 / beat.bpm; g.end = scheduleBeat(beat, g.t0, kind === "free" ? 16 : chart.lines.length, out); }
     if (kind === "free") startRecording(song ? null : out);
     if (kind === "mic") {
@@ -689,8 +694,14 @@ audio { width: 100%; margin-top: 12px; }
 
   function mult() { return Math.min(4, 1 + Math.floor(g.combo / 10)) * (songTime() < g.hypeUntil ? 2 : 1); }
   function judgeAt(at, lane) {
-    var win = g.win, best = null;
-    g.chart.notes.forEach(function (n) { if (!n.done && (lane === null || n.lane === lane) && Math.abs(n.t - at) <= win.good && (!best || Math.abs(n.t - at) < Math.abs(best.t - at))) best = n; });
+    var win = g.win, best = null, due = null;
+    g.chart.notes.forEach(function (n) {
+      if (n.done || (lane !== null && n.lane !== lane) || Math.abs(n.t - at) > win.good) return;
+      if (!best || Math.abs(n.t - at) < Math.abs(best.t - at)) best = n;
+      if (n.t <= at && (!due || n.t < due.t)) due = n; // the oldest word still waiting
+    });
+    // voice: words in a fast line sit a few tenths apart, so a late syllable goes to the word that was due
+    if (lane === null && due) best = due;
     if (!best) return;
     if (lane === null && at < best.t - win.great) return; // an early breath or beat bleed doesn't burn the word
     var dt = Math.abs(best.t - at), k = dt <= win.perfect ? "perfect" : (dt <= win.great ? "great" : "good"), now = songTime();
@@ -717,6 +728,7 @@ audio { width: 100%; margin-top: 12px; }
     el("crowdbar").className = "crowdbar" + (wild ? " hype" : "");
     if (g.kind === "tap") drawHighway(now); else drawStage(now);
     if (!g.yt && now < 0) { var beat = 60 / g.t.bpm; cx.fillStyle = cv("--fg"); cx.font = "72px Anton, Impact, sans-serif"; cx.textAlign = "center"; cx.textBaseline = "middle"; cx.fillText(String(Math.min(4, Math.ceil(-now / beat))), W / 2, H * 0.4); }
+    el("skip").hidden = !(g.yt && g.kind !== "free" && now > g.lyricsEnd);
     if (g.yt ? (now > g.endAt || yt.state === 0) : actx.currentTime > g.end) { finish(); return; }
     raf = requestAnimationFrame(frame);
   }
@@ -948,12 +960,20 @@ audio { width: 100%; margin-top: 12px; }
   function nudge(d) { if (!g || !g.yt) return; g.nudge = Math.round((g.nudge + d) * 100) / 100; showNudge(); var s = g.t.song; if (s) { s.nudge = g.nudge; saveSongs(); } }
   el("nudge-m").addEventListener("click", function () { nudge(-0.25); });
   el("nudge-p").addEventListener("click", function () { nudge(0.25); });
-  function go() { battle = el("battle").checked && mode !== "free" ? { scores: [] } : null; start(0); }
+  // one round at a time: a double-tap on START must not schedule a second beat on top of the first
+  var starting = false;
+  function launch(player) {
+    if (starting || g || sync) return;
+    starting = true;
+    Promise.resolve(start(player)).finally(function () { starting = false; });
+  }
+  function go() { if (starting || g || sync) return; battle = el("battle").checked && mode !== "free" ? { scores: [] } : null; launch(0); }
   el("play").addEventListener("click", go);
   el("again").addEventListener("click", go);
-  el("pass-go").addEventListener("click", function () { start(1); });
+  el("pass-go").addEventListener("click", function () { launch(1); });
   el("tomenu").addEventListener("click", function () { battle = null; show("menu"); });
   el("quit").addEventListener("click", quit);
+  el("skip").addEventListener("click", function () { if (g) finish(); });
 
   /* ---------- input ---------- */
   document.addEventListener("keydown", function (e) { var k = KEYS[e.key.toLowerCase()]; if (k === undefined || !g || e.repeat) return; e.preventDefault(); tapLane(k); });
